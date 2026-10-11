@@ -6,8 +6,8 @@ export const games: Game[] = [
  {slug:'team-detective',name:'Team Detective',category:'Team challenges',description:'Connect the clues and put your collective curiosity to work.',symbol:'⌕',color:'yellow'},
  {slug:'spot-the-difference',name:'Spot the Difference',category:'Team challenges',description:'Fresh eyes, tiny details, and a shared moment of discovery.',symbol:'◐',color:'green'},
  {slug:'this-or-that-office-edition',name:'This or That: Office Edition',category:'Icebreakers',description:'Small choices. Fun conversations. Get to know the people behind the work.',symbol:'⇄',color:'coral'},
- {slug:'sprint-spotlight',name:'Sprint Spotlight',category:'Sprint rituals',description:'Make space for the moments and people that made your sprint.',symbol:'✦',color:'yellow'},
+ {slug:'sprint-spotlight',name:'Planning Poker',category:'Sprint rituals',description:'Estimate stories privately, reveal together, and discuss the effort.',symbol:'✦',color:'yellow'},
  {slug:'memory-grid',name:'Memory Grid',category:'Team challenges',description:'Put your heads together and see what sticks.',symbol:'▤',color:'purple'},
- {slug:'collaborative-word-chain',name:'Collaborative Word Chain',category:'Icebreakers',description:'One word leads to another. See where your team takes the story.',symbol:'↝',color:'green'},
+ {slug:'collaborative-word-chain',name:'Collaborative Story',category:'Icebreakers',description:'Build a surprising story together, one sentence at a time.',symbol:'↝',color:'green'},
  {slug:'sprint-bingo',name:'Sprint Bingo',category:'Sprint rituals',description:'Find the familiar moments in your sprint and celebrate them together.',symbol:'⊞',color:'blue'},
 ];

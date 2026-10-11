@@ -1,0 +1,2 @@
+export function rng(seed:number){if(!Number.isInteger(seed)||seed<1||seed>2147483646)throw new Error('Invalid seed.');let state=seed;return()=>{state=state*16807%2147483647;return(state-1)/2147483646;};}
+export function shuffle<T>(items:readonly T[],random:()=>number){const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}

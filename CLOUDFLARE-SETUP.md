@@ -1,4 +1,4 @@
-# Team Playroom v0.3 · Cloudflare Free setup
+# Team Playroom v1.0 · Cloudflare Free setup
 
 Keep your existing **Cloudflare Pages** project. Add one **Worker** for online rooms; no Supabase or separate database service is needed. SQLite-backed Durable Objects are supported on Workers Free.
 

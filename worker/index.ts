@@ -24,7 +24,7 @@ export class RoomDurableObject {
   private async persist() {
     if(!this.room) return;
     await this.ctx.storage.put('room',this.room);
-    await this.ctx.storage.setAlarm(this.room.phase==='closed'?Date.now()+100:this.room.phase==='playing'?Math.min(this.room.endsAt,this.room.expiresAt):this.room.expiresAt);
+    await this.ctx.storage.setAlarm(this.room.phase==='closed'?Date.now()+100:this.room.phase==='playing'?Math.min(this.room.endsAt,this.room.expiresAt,this.room.game==='collaborative-word-chain'&&this.room.activity?.turnEndsAt?this.room.activity.turnEndsAt:Infinity):this.room.expiresAt);
   }
   async fetch(request: Request): Promise<Response> {
     return this.ctx.blockConcurrencyWhile(async()=>{
@@ -107,7 +107,7 @@ export default {
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:cors});
     const url=new URL(request.url);
     let payload: string | undefined;
-    if(url.pathname==='/health') return json({ok:true,version:'0.3',backend:'Durable Objects'});
+    if(url.pathname==='/health') return json({ok:true,version:'1.0',backend:'Durable Objects'});
     if(request.method==='POST') {
       const ip=request.headers.get('CF-Connecting-IP')??'local'; const now=Date.now();
       if(bursts.size>1000) bursts.clear();

@@ -1,3 +1,4 @@
+import {TimerSetting,Countdown} from '../collection/Timer';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { colors, makeQuestions, newSeed, questionCounts, type QuestionCount, score, winner, type Answer, type ColorName, type Question } from './engine';
@@ -6,6 +7,7 @@ import OnlineRoom from '../rooms/OnlineRoom';
 
 type Phase = 'setup' | 'ready' | 'playing' | 'feedback' | 'results';
 export default function ColorClash() {
+  const [timer,setTimer]=useState(0);const [deadline,setDeadline]=useState(0);
   const [phase, setPhase] = useState<Phase>('setup');
   const [mode, setMode] = useState<'solo' | 'teams' | 'online'>('solo');
   const [cue, setCue] = useState(false);
@@ -23,7 +25,7 @@ export default function ColorClash() {
   const currentName = mode === 'solo' ? 'You' : `Team ${team === 0 ? 'A' : 'B'}`;
 
   function start() {
-    const nextSeed = newSeed(seed); setSeed(nextSeed); setQuestions(makeQuestions(nextSeed, count)); setTeam(0); setAnswers([]); setCompleted([]); setPhase('ready');
+    const nextSeed = newSeed(seed); setSeed(nextSeed); setQuestions(makeQuestions(nextSeed, count)); setDeadline(0); setTeam(0); setAnswers([]); setCompleted([]); setPhase('ready');
   }
   function answer(choice: ColorName) {
     if (phase !== 'playing' || !question || answering.current) return;
@@ -35,7 +37,7 @@ export default function ColorClash() {
     if (answers.length === count) {
       setCompleted(old => [...old, answers]);
       if (mode === 'teams' && team === 0) {
-        setTeam(1); setAnswers([]); setPhase('ready');
+        setDeadline(0); setTeam(1); setAnswers([]); setPhase('ready');
       } else setPhase('results');
     } else setPhase('playing');
   }
@@ -64,10 +66,11 @@ export default function ColorClash() {
 
     {phase === 'setup' && <div className="clash-layout">
       <div className="clash-panel"><span className="eyebrow">HOW TO PLAY</span><h2>Pick the ink.<br/>Ignore the word.</h2><div className="clash-example"><span style={{ color: colors[1].hex }}>RED</span><p>This word is printed in blue.<br/><strong>The correct answer is Blue.</strong></p></div><ol><li>Choose the color the word is printed in.</li><li>Answer {count} questions. Each correct answer earns 100 points.</li><li>Take your time, or challenge yourself to answer quickly.</li></ol><p className="clash-small">No timer or speed bonus. Color recognition is part of this game; enable the color cue for a text alternative.</p></div>
-      <div className="clash-panel setup-panel"><h2>Make it your game.</h2><fieldset><legend>Who's playing?</legend><label className={mode==='solo'?'mode-card chosen':'mode-card'}><input type="radio" name="mode" value="solo" checked={mode==='solo'} onChange={()=>setMode('solo')}/><span><strong>Solo warm-up</strong><small>One player. A little brain exercise.</small></span></label><label className={mode==='teams'?'mode-card chosen':'mode-card'}><input type="radio" name="mode" value="teams" checked={mode==='teams'} onChange={()=>setMode('teams')}/><span><strong>Local Teams · Pass & play</strong><small>Team A plays, then hands the device to Team B.</small></span></label><label className="mode-card"><input type="radio" name="mode" value="online" checked={false} onChange={()=>setMode('online')}/><span><strong>Online Room</strong><small>Different devices. One shared round.</small></span></label></fieldset><label className="room-field">Questions<select value={count} onChange={e=>setCount(Number(e.target.value) as QuestionCount)}>{questionCounts.map(n=><option key={n} value={n}>{n} questions</option>)}</select></label><label className="cue-option"><input type="checkbox" checked={cue} onChange={e=>setCue(e.target.checked)}/><span><strong>Show a color cue</strong><small>Also show the ink color as text.</small></span></label><button className="button" onClick={start}>Let's play <span aria-hidden="true">→</span></button><p className="clash-small">Use the buttons or keys 1–4. Scores stay in this round and disappear when you leave or reload.</p></div>
+      <div className="clash-panel setup-panel"><h2>Make it your game.</h2><fieldset><legend>Who's playing?</legend><label className={mode==='solo'?'mode-card chosen':'mode-card'}><input type="radio" name="mode" value="solo" checked={mode==='solo'} onChange={()=>setMode('solo')}/><span><strong>Solo warm-up</strong><small>One player. A little brain exercise.</small></span></label><label className={mode==='teams'?'mode-card chosen':'mode-card'}><input type="radio" name="mode" value="teams" checked={mode==='teams'} onChange={()=>setMode('teams')}/><span><strong>Local Teams · Pass & play</strong><small>Team A plays, then hands the device to Team B.</small></span></label><label className="mode-card"><input type="radio" name="mode" value="online" checked={false} onChange={()=>setMode('online')}/><span><strong>Online Room</strong><small>Different devices. One shared round.</small></span></label></fieldset><label className="room-field">Questions<select value={count} onChange={e=>setCount(Number(e.target.value) as QuestionCount)}>{questionCounts.map(n=><option key={n} value={n}>{n} questions</option>)}</select></label><label className="cue-option"><input type="checkbox" checked={cue} onChange={e=>setCue(e.target.checked)}/><span><strong>Show a color cue</strong><small>Also show the ink color as text.</small></span></label><TimerSetting value={timer} onChange={setTimer}/><button className="button" onClick={start}>Let's play <span aria-hidden="true">→</span></button><p className="clash-small">Use the buttons or keys 1–4. Scores stay in this round and disappear when you leave or reload.</p></div>
     </div>}
 
-    {phase === 'ready' && <div className="clash-panel clash-centered"><span className="ready-art" aria-hidden="true">◒</span><h2>{mode==='teams'?`Team ${team===0?'A':'B'}, you're up.`:'Ready to clash?'}</h2><p>{team===1?'Pass the device to Team B. You’ll play the same questions as Team A.':`${count} questions. Four colors. One rule: choose the ink color.`}</p><p className="clash-small">{mode==='teams'?'Keep the other team from watching for a fair turn. ':''}{cue?'Color cue is on.':'Color cue is off.'}</p><button className="button" onClick={()=>setPhase('playing')}>Start {mode==='teams'?'team turn':'round'} →</button><button className="clash-text-button" onClick={()=>setPhase('setup')}>Back to setup</button></div>}
+    {(phase==='playing'||phase==='feedback')&&<Countdown endsAt={deadline} onExpire={()=>{setCompleted(old=>[...old,answers]);if(mode==='teams'&&team===0){setTeam(1);setAnswers([]);setDeadline(0);setPhase('ready');}else setPhase('results');}}/>}
+    {phase === 'ready' && <div className="clash-panel clash-centered"><span className="ready-art" aria-hidden="true">◒</span><h2>{mode==='teams'?`Team ${team===0?'A':'B'}, you're up.`:'Ready to clash?'}</h2><p>{team===1?'Pass the device to Team B. You’ll play the same questions as Team A.':`${count} questions. Four colors. One rule: choose the ink color.`}</p><p className="clash-small">{mode==='teams'?'Keep the other team from watching for a fair turn. ':''}{cue?'Color cue is on.':'Color cue is off.'}</p><button className="button" onClick={()=>{setDeadline(timer?Date.now()+timer*1000:0);setPhase('playing');}}>Start {mode==='teams'?'team turn':'round'} →</button><button className="clash-text-button" onClick={()=>setPhase('setup')}>Back to setup</button></div>}
 
     {(phase === 'playing' || phase === 'feedback') && <div className="clash-play">
       <div className="clash-stats"><span><small>PLAYING</small><strong>{currentName}</strong></span><span><small>QUESTION</small><strong>{phase==='feedback'?answers.length:answers.length+1} / {count}</strong></span><span><small>SCORE</small><strong>{score(answers)} pts</strong></span></div>

@@ -10,3 +10,5 @@ dist/
 worker-dist/
 
 .qa-dist/
+
+.vs/

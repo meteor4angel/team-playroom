@@ -16,6 +16,6 @@ export async function request<T>(path: string, data?: unknown, token?: string): 
   finally {window.clearTimeout(timeout);}
 }
 export type Joined={credentials:Credentials;room:RoomView};
-export function createOnlineRoom(nickname:string,settings:RoomSettings) {return request<Joined>('/api/rooms',{nickname,settings,game:'color-clash'});}
+export function createOnlineRoom(nickname:string,settings:RoomSettings,game='color-clash') {return request<Joined>('/api/rooms',{nickname,settings,game});}
 export function joinOnlineRoom(code:string,nickname:string) {return request<Joined>(`/api/rooms/${code}/join`,{nickname});}
 export function roomAction(credentials:Credentials,action:RoomAction) {return request<{room:RoomView}>(`/api/rooms/${credentials.code}/action`,action,credentials.token);}
