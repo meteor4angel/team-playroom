@@ -1,0 +1,64 @@
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {Link,useNavigate,useParams} from 'react-router-dom';
+import {colors,makeQuestions,questionCounts,type ColorName,type QuestionCount} from '../shared/colorClash';
+import {leaderboard,type Credentials,type RoomSettings} from '../shared/rooms';
+import {clearSession,createOnlineRoom,joinOnlineRoom,loadSession,onlineConfigured,saveSession} from './client';
+import {useRoom} from './useRoom';
+import '../colorClash/colorClash.css';
+import './rooms.css';
+
+export default function OnlineRoom({onBack}:{onBack?:()=>void}) {
+ const {code:routeCode}=useParams();const navigate=useNavigate();
+ const codeFromUrl=(routeCode??'').toUpperCase();
+ const [credentials,setCredentials]=useState<Credentials|null>(()=>codeFromUrl?loadSession(codeFromUrl):null);
+ const [nickname,setNickname]=useState('');const [code,setCode]=useState(codeFromUrl);
+ const [settings,setSettings]=useState<RoomSettings>({count:12,scoring:'individual',cue:false});
+ const [entryBusy,setEntryBusy]=useState(false);const [entryError,setEntryError]=useState('');const [notice,setNotice]=useState('');
+ const {room,status,error,busy,offset,action}=useRoom(credentials);
+ const [now,setNow]=useState(Date.now());const [feedback,setFeedback]=useState<number|null>(null);
+ const submitting=useRef(false);
+ useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),250);return()=>clearInterval(timer);},[]);
+ useEffect(()=>setFeedback(null),[room?.round]);
+ const questions=useMemo(()=>room?.seed?makeQuestions(room.seed,room.settings.count):[],[room?.seed,room?.settings.count]);
+ const me=room?.players.find(p=>p.id===room.you);const host=room?.hostId===room?.you;
+ const countdown=room?Math.max(0,Math.ceil((room.startsAt-now-offset)/1000)):0;
+ const waiting=room?.phase==='playing'&&(me?.finished||now+offset>=room.endsAt);
+ const active=room?.players.filter(p=>p.active)??[];
+ const table=room?leaderboard(room.players,room.round):null;
+ const currentIndex=feedback??room?.answers.length??0;
+ const question=questions[currentIndex];
+ async function enter(create:boolean) {
+  setEntryBusy(true);setEntryError('');
+  try {const joined=create?await createOnlineRoom(nickname,settings):await joinOnlineRoom(code.trim().toUpperCase(),nickname);saveSession(joined.credentials);setCredentials(joined.credentials);navigate(`/room/${joined.credentials.code}`);}
+  catch(e){setEntryError(e instanceof Error?e.message:'Could not join the room.');}finally{setEntryBusy(false);}
+ }
+ async function answer(choice:ColorName) {
+  if(!room||busy||submitting.current||feedback!==null||countdown||waiting||status!=='Connected')return;
+  submitting.current=true;
+  const index=room.answers.length;const result=await action({type:'answer',round:room.round,index,choice});
+  if(result && result.round===room.round)setFeedback(index);
+  submitting.current=false;
+ }
+ useEffect(()=>{
+  if(room?.phase!=='playing'||countdown||waiting||feedback!==null)return;
+  const listener=(e:KeyboardEvent)=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey||['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement)?.tagName))return;const c=colors.find(c=>c.key===e.key);if(c){e.preventDefault();void answer(c.name);}};
+  window.addEventListener('keydown',listener);return()=>window.removeEventListener('keydown',listener);
+ },[room,feedback,countdown,waiting,busy,status]);
+ async function leave() {if(!credentials)return;const result=await action({type:'leave'});if(result){clearSession(credentials.code);setCredentials(null);navigate('/games/color-clash');onBack?.();}}
+ async function share() {if(!room)return;try{await navigator.clipboard.writeText(`${location.origin}/room/${room.code}`);setNotice('Room link copied.');}catch{setNotice('Copy the link below to share.');}}
+ const changeSettings=(patch:Partial<RoomSettings>)=>{if(room)void action({type:'settings',settings:{...room.settings,...patch}});else setSettings(s=>({...s,...patch}));};
+ const setupSettings=room?.settings??settings;
+ function settingsFields(disabled:boolean) {return <div className="room-settings"><label>Questions<select aria-label="Questions" disabled={disabled} value={setupSettings.count} onChange={e=>changeSettings({count:Number(e.target.value) as QuestionCount})}>{questionCounts.map(n=><option key={n} value={n}>{n} questions</option>)}</select></label><label>Competition<select aria-label="Competition" disabled={disabled} value={setupSettings.scoring} onChange={e=>changeSettings({scoring:e.target.value as RoomSettings['scoring']})}><option value="individual">Individual</option><option value="teams">Team A / Team B</option></select></label><label className="room-cue"><input type="checkbox" disabled={disabled} checked={setupSettings.cue} onChange={e=>changeSettings({cue:e.target.checked})}/>Show a text color cue for everyone</label></div>;}
+ return <section className="clash-page"><Link className="text-link" to="/games">← Back to all games</Link><div className="clash-heading"><div><span className="eyebrow">COLOR CLASH · ONLINE ROOM</span><h1>Play together.</h1></div><span className="clash-tag">{credentials?status:'Up to 12 players'}</span></div>
+ {(entryError||error)&&<div className="room-error" role="alert">{entryError||error}{credentials&&<button className="clash-text-button" onClick={()=>{clearSession(credentials.code);setCredentials(null);navigate('/games/color-clash');onBack?.();}}>Forget this session and start again</button>}</div>}
+ {!onlineConfigured?<div className="clash-panel clash-centered"><h2>Online rooms are being connected.</h2><p>The room service isn't configured for this site yet. Solo and Local Teams are ready to play.</p><Link className="button" to="/games/color-clash" onClick={onBack}>Play on this device →</Link></div>:!credentials?<div className="clash-layout"><div className="clash-panel"><h2>Your team. Your room.</h2><p>Share the code with a friend, get ready in the lobby, and start the same round together.</p><label className="room-field">Your nickname<input maxLength={24} minLength={2} value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="2–24 characters" autoComplete="off"/></label><p className="clash-small">Rooms expire after two hours. Nicknames and scores are visible to room members. This browser tab remembers your session for reconnecting.</p></div><div className="clash-panel"><h2>Create or join.</h2>{settingsFields(entryBusy)}<button className="button" disabled={entryBusy||nickname.trim().length<2} onClick={()=>enter(true)}>Create room →</button><div className="join-divider">or join a friend</div><label className="room-field">Room code<input value={code} maxLength={8} placeholder="8-character code" onChange={e=>setCode(e.target.value.toUpperCase())}/></label><button className="button" disabled={entryBusy||nickname.trim().length<2||!/^[A-Z2-9]{8}$/.test(code.trim())} onClick={()=>enter(false)}>Join room →</button>{onBack&&<button className="clash-text-button" onClick={onBack}>Back to local modes</button>}</div></div>:!room?<div className="clash-panel"><p>Connecting to your room…</p><button className="clash-text-button" onClick={()=>{clearSession(credentials.code);setCredentials(null);}}>Join again</button></div>:<>
+ <div className="room-share"><span>Room <strong>{room.code}</strong> · Round {room.round||'not started'}</span><button className="clash-text-button" onClick={share}>Copy invite link</button><button className="clash-text-button" disabled={busy} onClick={leave}>Leave room</button><input aria-label="Shareable room link" readOnly value={`${location.origin}/room/${room.code}`}/><span role="status">{notice}</span></div>
+ {room.phase==='closed'?<div className="clash-panel"><h2>Room closed.</h2><p>Create a new room to keep playing.</p></div>:<>
+ {(room.phase==='lobby'||room.phase==='finished')&&<div className="clash-layout"><div className="clash-panel"><h2>{room.phase==='finished'?'Next round?':'Gather your people.'}</h2>{settingsFields(!host||busy)}<p className="clash-small">{host?'Changing settings resets everyone’s ready status.':'The host chooses the round settings.'} Each round has the same questions for everyone.</p>{room.settings.scoring==='teams'&&<label className="room-field">Your team<select aria-label="Your team" disabled={busy||me?.ready} value={me?.team??'A'} onChange={e=>action({type:'ready',ready:false,team:e.target.value as 'A'|'B'})}><option value="A">Team A</option><option value="B">Team B</option></select></label>}<button className="button" disabled={busy||status!=='Connected'} onClick={()=>action({type:'ready',ready:!me?.ready,team:me?.team??'A'})}>{me?.ready?'Not ready':'I’m ready'}</button>{host&&<button className="button room-start" disabled={busy||status!=='Connected'||active.length<2||!active.every(p=>p.ready)||(room.settings.scoring==='teams'&&!['A','B'].every(t=>active.some(p=>p.team===t)))} onClick={()=>action({type:'start'})}>{room.phase==='finished'?'Start rematch →':'Start game →'}</button>}<p className="clash-small">At least two players must join and everyone must be ready. Team competition also needs someone on each team. Rematch creates a new shared seed.</p></div><div className="clash-panel"><h2>Lobby · {active.length}/12</h2><ul className="lobby-list">{active.map(p=><li key={p.id}><span><strong>{p.nickname}{p.id===room.you?' (you)':''}</strong><small>{p.id===room.hostId?'Host · ':''}{room.settings.scoring==='teams'?`Team ${p.team} · `:''}{p.connected?'Connected':'Disconnected'}</small></span><span>{p.ready?'✓ Ready':'Getting ready'}</span></li>)}</ul></div></div>}
+ {room.phase==='playing'&&(countdown>0?<div className="clash-panel clash-centered"><h2>Starting together in…</h2><strong className="room-countdown" role="timer">{countdown}</strong><p>Same questions. Same order. Let's clash.</p></div>:waiting?<div className="clash-panel clash-centered"><h2>{me?.finished?'Your turn is complete!':'Round time is up.'}</h2><p>Waiting for the remaining players or the host to finish the round.</p><p className="clash-small">{active.filter(p=>p.finished).length} of {active.length} players finished.</p></div>:question&&<div className="clash-play"><div className="clash-stats"><span><small>PLAYER</small><strong>{me?.nickname}</strong></span><span><small>QUESTION</small><strong>{currentIndex+1} / {room.settings.count}</strong></span><span><small>SCORE</small><strong>{me?.score} pts</strong></span></div><progress aria-label="Questions answered" max={room.settings.count} value={room.answers.length}/><div className="clash-panel question-panel"><p className="eyebrow">WHAT COLOR IS THE INK?</p><div className="clash-word" style={{color:colors.find(c=>c.name===question.ink)?.hex}}>{question.word.toUpperCase()}</div>{room.settings.cue&&<p className="color-cue">Ink color: {question.ink}</p>}<div className="answer-grid">{colors.map(c=><button className="color-answer" disabled={busy||feedback!==null||status!=='Connected'} key={c.name} onClick={()=>answer(c.name)}><span className="color-dot" aria-hidden="true" style={{background:c.hex}}/><strong>{c.name}</strong><kbd>{c.key}</kbd></button>)}</div>{feedback!==null?<div className="answer-feedback"><p role="status">{room.answers[feedback]?.correct?'Correct! +100 points.':'The ink was '+question.ink+'.'}</p><button className="button" onClick={()=>setFeedback(null)}>Next question →</button></div>:<p className="clash-small">Choose a button or press 1–4. Answers are confirmed by the room server.</p>}</div></div>)}
+ {(room.phase==='playing'||room.phase==='finished')&&table&&<div className="clash-panel room-results"><h2>{room.phase==='finished'?'Final results':'Round progress'}</h2>{room.settings.scoring==='teams'&&<div className="round-results">{table.teams.map(t=><div className="result-tile" key={t.team}><h3>Team {t.team}</h3><strong>{t.score} pts</strong></div>)}</div>}<div className="table-scroll"><table><caption>{room.settings.scoring==='teams'?'Individual contributions':'Individual leaderboard'}</caption><thead><tr><th scope="col">Rank</th><th scope="col">Player</th>{room.settings.scoring==='teams'&&<th scope="col">Team</th>}<th scope="col">Score</th><th scope="col">Progress</th></tr></thead><tbody>{table.individuals.map(p=><tr key={p.id}><td>{p.rank}</td><th scope="row">{p.nickname}</th>{room.settings.scoring==='teams'&&<td>{p.roundTeam}</td>}<td>{p.score}</td><td>{p.answered}/{room.settings.count}{!p.active?' · Left':!p.connected?' · Offline':''}</td></tr>)}</tbody></table></div><p className="clash-small">Team totals sum each member's points; teams can have different sizes. Equal scores share a rank. The round ends when everyone finishes, the host ends it, or ten minutes pass.</p>{host&&room.phase==='playing'&&<details><summary>End this round early</summary><p>Current scores become final for everyone.</p><button className="clash-text-button" disabled={busy} onClick={()=>action({type:'finish'})}>End round now</button></details>}</div>}
+ </>}
+ </>}
+ </section>;
+}
+

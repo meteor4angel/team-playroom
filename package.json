@@ -1,13 +1,16 @@
 {
   "name": "team-playroom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --configLoader native",
-    "build": "tsc --noEmit && vite build --configLoader native",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json && vite build --configLoader native && node scripts/build-worker.mjs",
     "preview": "vite preview --host 127.0.0.1 --configLoader native",
-    "test": "vitest run --configLoader native"
+    "test": "vitest run --configLoader native",
+    "rooms:dev": "node scripts/build-worker.mjs && node scripts/dev-rooms.mjs",
+    "rooms:deploy": "node scripts/build-worker.mjs && wrangler deploy --no-bundle",
+    "test:rooms": "node scripts/build-worker.mjs && node scripts/test-rooms.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -15,11 +18,14 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261010.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "miniflare": "4.20260730.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "wrangler": "^4.149.0"
   }
 }
